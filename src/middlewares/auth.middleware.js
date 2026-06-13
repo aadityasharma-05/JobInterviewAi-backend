@@ -4,7 +4,10 @@ const tokenBlacklistModel = require("../models/blacklist.model")
 
 
 async function authUser(req, res, next) {
-
+    console.log("--- Auth Middleware Trace ---");
+    console.log("Origin Header:", req.headers.origin);
+    console.log("Cookies Received:", req.cookies);
+    
     const token = req.cookies.token
 
     if (!token) {
