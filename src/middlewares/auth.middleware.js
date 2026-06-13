@@ -11,6 +11,7 @@ async function authUser(req, res, next) {
     const token = req.cookies.token
 
     if (!token) {
+        console.log("Auth Failure: Token not provided in cookies.");
         return res.status(401).json({
             message: "Token not provided."
         })
@@ -21,6 +22,7 @@ async function authUser(req, res, next) {
     })
 
     if (isTokenBlacklisted) {
+        console.log("Auth Failure: Token is blacklisted.");
         return res.status(401).json({
             message: "token is invalid"
         })
@@ -30,11 +32,12 @@ async function authUser(req, res, next) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
         req.user = decoded
+        console.log("Auth Success: Token verified for user:", decoded.username);
 
         next()
 
     } catch (err) {
-
+        console.log("Auth Failure: JWT verification failed:", err.message);
         return res.status(401).json({
             message: "Invalid token."
         })
