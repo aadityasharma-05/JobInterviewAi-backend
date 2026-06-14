@@ -4,17 +4,28 @@ const jwt = require("jsonwebtoken")
 const tokenBlacklistModel = require("../models/blacklist.model")
 
 const getCookieOptions = (req) => {
-    const isSecureRequest = req.secure || req.headers["x-forwarded-proto"] === "https";
-    const secure = isSecureRequest;
-    const sameSite = secure ? "none" : "lax";
+    const isProduction = process.env.NODE_ENV === "production"
+    const isSecureRequest = req.secure || req.headers["x-forwarded-proto"] === "https"
 
+    if (isProduction && isSecureRequest) {
+        // Production + HTTPS: allow cross-origin cookie sharing
+        return {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        }
+    }
+
+    // Development: use lax (works perfectly with Vite proxy — same-origin)
     return {
         httpOnly: true,
-        secure,
-        sameSite,
+        secure: false,
+        sameSite: "lax",
         maxAge: 24 * 60 * 60 * 1000 // 1 day
     }
 }
+
 
 /**
  * @name registerUserController
@@ -32,7 +43,7 @@ async function registerUserController(req, res) {
     }
 
     const isUserAlreadyExists = await userModel.findOne({
-        $or: [ { username }, { email } ]
+        $or: [{ username }, { email }]
     })
 
     if (isUserAlreadyExists) {
@@ -55,11 +66,12 @@ async function registerUserController(req, res) {
         { expiresIn: "1d" }
     )
 
-    res.cookie("token", token, getCookieOptions(req))
+
 
 
     res.status(201).json({
         message: "User registered successfully",
+        token,
         user: {
             id: user._id,
             username: user.username,
@@ -101,9 +113,10 @@ async function loginUserController(req, res) {
         { expiresIn: "1d" }
     )
 
-    res.cookie("token", token, getCookieOptions(req))
+
     res.status(200).json({
         message: "User loggedIn successfully.",
+        token,
         user: {
             id: user._id,
             username: user.username,
@@ -119,18 +132,23 @@ async function loginUserController(req, res) {
  * @access public
  */
 async function logoutUserController(req, res) {
-    const token = req.cookies.token
 
-    if (token) {
-        await tokenBlacklistModel.create({ token })
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+
+        const token = authHeader.split(" ")[1];
+
+        await tokenBlacklistModel.create({
+            token
+        });
+
     }
-
-    const { maxAge, ...clearOptions } = getCookieOptions(req)
-    res.clearCookie("token", clearOptions)
 
     res.status(200).json({
         message: "User logged out successfully"
-    })
+    });
+
 }
 
 /**
